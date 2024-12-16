@@ -9,6 +9,9 @@ use Closure;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\Schema;
 
 class Resolve
 {
@@ -18,6 +21,13 @@ class Resolve
      * @var array
      */
     private array $fields = [];
+
+    /**
+     * Filter field name "column".
+     *
+     * @var string
+     */
+    private string $filterFiled = '';
 
     /**
      * List of available filters.
@@ -52,7 +62,7 @@ class Resolve
      */
     public function apply(Builder $query, string $field, array|string $values): void
     {
-        if (!$this->safe(fn () => $this->validate([$field => $values]))) {
+        if (!$this->safe(fn() => $this->validate([$field => $values]))) {
             return;
         }
 
@@ -120,10 +130,10 @@ class Resolve
         // Resolve the filter using the appropriate strategy
         if ($this->filterList->get($field) !== null) {
             //call apply method of the appropriate filter class
-            $this->safe(fn () => $this->applyFilterStrategy($query, $field, $filters));
+            $this->safe(fn() => $this->applyFilterStrategy($query, $field, $filters));
         } else {
             // If the field is not recognized as a filter strategy, it is treated as a relation
-            $this->safe(fn () => $this->applyRelationFilter($query, $field, $filters));
+            $this->safe(fn() => $this->applyRelationFilter($query, $field, $filters));
         }
     }
 
@@ -187,7 +197,41 @@ class Resolve
     {
         // remove the last field until its empty
         $field = array_shift($this->fields);
-        $query->whereHas($field, fn ($subQuery) => $this->applyRelations($subQuery, $callback));
+
+        // get the relation
+        if (is_string($field)) {
+            $relation = Relation::noConstraints(function () use ($query, $field) {
+                return $query->getModel()->{$field}();
+            });
+        }
+
+        // Check if the field is a morphTo relation
+        if (isset($relation) && $relation instanceof MorphTo) {
+            $types = $query->getModel()->newModelQuery()->distinct()->pluck($relation->getMorphType())->filter()->all();
+            foreach ($types as $key => &$type) {
+                $type = Relation::getMorphedModel($type) ?? $type;
+                // Check if the field exists in the morph query model
+                if (!Schema::hasColumn((new $type)->getTable(), $this->filterFiled)) {
+                    unset($types[$key]);
+                }
+            }
+
+            $types = array_values($types);
+
+            if ($types) {
+                return $query->whereHasMorph($field, $types, function ($subQuery) use ($callback) {
+                    $this->applyRelations($subQuery, $callback);
+                });
+            }
+        }
+
+        return $query->whereHas($field, function ($subQuery) use ($callback) {
+            // Check if the field exists in the sub-query model
+            if (Schema::hasColumn($subQuery->getModel()
+                ->getTable(), $this->filterFiled)) {
+                $this->applyRelations($subQuery, $callback);
+            }
+        });
     }
 
     /**
