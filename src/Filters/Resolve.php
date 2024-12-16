@@ -148,7 +148,7 @@ class Resolve
     {
         $filter = $this->filterList->get($operator);
 
-        $field = end($this->fields);
+        $this->filterFiled = $field = end($this->fields);
 
         $callback = (new $filter($query, $field, $filters))->apply();
 
