@@ -219,10 +219,12 @@ class Resolve
             $types = array_values($types);
 
             if ($types) {
-                return $query->whereHasMorph($field, $types, function ($subQuery) use ($callback) {
+                $query->whereHasMorph($field, $types, function ($subQuery) use ($callback) {
                     $this->applyRelations($subQuery, $callback);
                 });
             }
+
+            return $query;
         }
 
         return $query->whereHas($field, function ($subQuery) use ($callback) {
