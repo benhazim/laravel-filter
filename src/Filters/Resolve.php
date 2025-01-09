@@ -67,6 +67,7 @@ class Resolve
     public function apply(Builder $query, string $field, array|string $values, $forceTrashed = false): void
     {
         $this->forceTrashed = $forceTrashed;
+
         if (!$this->safe(fn() => $this->validate([$field => $values]))) {
             return;
         }
@@ -155,7 +156,7 @@ class Resolve
 
         $this->filterFiled = $field = end($this->fields);
 
-        $callback = (new $filter($query, $field, $filters))->apply();
+        $callback = (new $filter($query, $field, $filters, $this->forceTrashed))->apply();
 
         $this->filterRelations($query, $callback);
     }
