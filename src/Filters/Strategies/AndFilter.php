@@ -26,7 +26,7 @@ class AndFilter extends Filter
             foreach ($this->values as $value) {
                 $query->where(function ($query) use ($value) {
                     foreach ($value as $key => $item) {
-                        app(Resolve::class)->apply($query, $key, $item);
+                        app(Resolve::class)->apply($query, $key, $item, $this->forceTrashed);
                     }
                 });
             }
