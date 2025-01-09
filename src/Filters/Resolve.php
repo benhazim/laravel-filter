@@ -5,6 +5,8 @@ namespace Abbasudo\Purity\Filters;
 use Abbasudo\Purity\Exceptions\FieldNotSupported;
 use Abbasudo\Purity\Exceptions\NoOperatorMatch;
 use Abbasudo\Purity\Exceptions\OperatorNotSupported;
+use App\Enums\Tenancy\Trashed;
+use App\Helpers\Tenancy\ActionHandler;
 use Closure;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
@@ -40,6 +42,8 @@ class Resolve
 
     private array $previousModels = [];
 
+    private bool $forceTrashed = false;
+
     /**
      * @param FilterList $filterList
      * @param Model      $model
@@ -60,8 +64,9 @@ class Resolve
      *
      * @return void
      */
-    public function apply(Builder $query, string $field, array|string $values): void
+    public function apply(Builder $query, string $field, array|string $values, $forceTrashed = false): void
     {
+        $this->forceTrashed = $forceTrashed;
         if (!$this->safe(fn() => $this->validate([$field => $values]))) {
             return;
         }
@@ -219,7 +224,13 @@ class Resolve
             $types = array_values($types);
 
             if ($types) {
-                $query->whereHasMorph($field, $types, function ($subQuery) use ($callback) {
+                $query->whereHasMorph($field, $types, function ($subQuery) use ($field, $callback) {
+                    if ($this->forceTrashed) {
+                        $subQuery->withTrashed();
+                    } elseif (request()->filled('includes.' . $field . '.trashed')) {
+                        $trashed = request()->enum('trashed', Trashed::class);
+                        $subQuery->{ActionHandler::handleTrashed($trashed)}();
+                    }
                     $this->applyRelations($subQuery, $callback);
                 });
             }

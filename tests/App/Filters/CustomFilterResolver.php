@@ -14,7 +14,7 @@ class CustomFilterResolver extends Resolve
         parent::__construct($filterList, $model);
     }
 
-    public function apply(Builder $query, string $field, array|string $values): void
+    public function apply(Builder $query, string $field, array|string $values, $forceTrashed = false): void
     {
         // do some custom logic
         if (isset($values['$pure']) && $values['$pure'] === 'true') {
@@ -23,6 +23,6 @@ class CustomFilterResolver extends Resolve
             return;
         }
 
-        parent::apply($query, $field, $values);
+        parent::apply($query, $field, $values, $forceTrashed);
     }
 }
